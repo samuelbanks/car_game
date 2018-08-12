@@ -1,0 +1,38 @@
+input#messageBox {
+  padding: 9px;
+  width:   196px;
+  margin:  0;
+  height:  100%;
+  float: left;
+}
+button#sendButton {
+  padding: 9px;
+  width:   100px;
+  margin:  0;
+  height:  100%;
+  float: left;
+}
+
+div#messages {
+  height: 460px;
+
+}
+
+div#submitArea {
+  height: 40px;
+  margin: 0;
+  padding: 0;
+}
+
+div#centered {
+  border: 1px solid black;
+  height:500px;
+  width:300px;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-right: -50%;
+  transform: translate(-50%, -50%)
+}
