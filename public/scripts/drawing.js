@@ -18,19 +18,23 @@ function drawGrid(canvas, offset)
 {
 
 	context = canvas.getContext("2d");
+  /*context.beginPath();
+  context.lineWidth = 1;
+  context.strokeStyle = "#aaa";
+  for (var x = -offset.x; x <= canvas.width+offset.x; x += gridTileSize.w)
+  {
+    context.moveTo(x-.5, 0);
+    context.lineTo(x-.5, canvas.height);
+  }
+  for (var y = -offset.y; y <= canvas.height+offset.y; y += gridTileSize.h)
+  {
+    context.moveTo(0, y-.5);
+    context.lineTo(canvas.width, y-.5);
+  }
+  context.closePath();
+  context.stroke();*/
   context.beginPath();
   context.lineWidth = 1;
-  context.strokeStyle = "#fff";
-  // for (var x = -offset.x; x <= canvas.width+offset.x; x += gridTileSize.w)
-  // {
-  //   context.moveTo(x-.5, 0);
-  //   context.lineTo(x-.5, canvas.height);
-  // }
-  // for (var y = -offset.y; y <= canvas.height+offset.y; y += gridTileSize.h)
-  // {
-  //   context.moveTo(0, y-.5);
-  //   context.lineTo(canvas.width, y-.5);
-  // }
   context.strokeStyle = "#444";
   for (var x = -offset.x; x <= canvas.width; x += gridTileSize.w)
   {

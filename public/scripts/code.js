@@ -3,12 +3,36 @@ var isKeyPressed = Array();
 var keyNames = Array();
 var tickerHandle = 0;
 var gridOffset = {x: 0, y: 0};
-var gridTileSize = {w: 200, h: 200};
+var gridTileSize = {w: 180, h: 180};
 var gameFullSize;
 var gameCentre;
 var gameCanvas;
+var mobile = false;
 
 var images = [];   // using optional size for image
+
+onWindowResizeFinish = function(callback)
+{
+  var rtime;
+  var timeout = false;
+  var delta = 200;
+  $(window).resize(function() {
+    rtime = new Date();
+    if (timeout === false) {
+      timeout = true;
+      setTimeout(() => {resizeEnd(callback)}, delta);
+    }
+  });
+
+  function resizeEnd(callback) {
+    if (new Date() - rtime < delta) {
+      setTimeout(() => {resizeEnd(callback)}, delta);
+    } else {
+      timeout = false;
+      callback();
+    }
+  }
+}
 
 pauseGame = function()
 {
@@ -40,7 +64,9 @@ showPausedMessage = function()
   ctx.closePath();
   ctx.stroke();
 
-  ctx.drawImage(images["paused"], (w - images["paused"].width)/2,(h-images["paused"].height)/2);
+  ctx.drawImage(images["paused"],
+                (w - images["paused"].width)  / 2,
+                (h - images["paused"].height) / 2);
 }
 
 startGame = function()
@@ -105,17 +131,35 @@ function releaseKeys(keySet)
 	keySet["DOWN" ] = false;
 	keySet["LEFT" ] = false;
 	keySet["RIGHT"] = false;
-	keySet["SPACE"] = false
+	keySet["SPACE"] = false;
+  keySet["z"] = false;
+}
+
+resizeCanvas = function()
+{
+  console.log("resize");
+  oldWidth = gameCanvas.width;
+  oldHeight = gameCanvas.height;
+  gameCanvas.width  = $(window).width()  - 20 * 2;
+  gameCanvas.height = $(window).height() - 20 * 2;
+  gameFullSize = {w: gameCanvas.width, h: gameCanvas.height};
+  gameCentre = {x: gameFullSize.w / 2, y: gameFullSize.h / 2};
+  gridOffset.x += ((gameCanvas.width - oldWidth) % gridTileSize.w) / 2;
+  gridOffset.y += ((gameCanvas.height - oldHeight) % gridTileSize.h) / 2;
 }
 
 function initialise()
 {
+  onWindowResizeFinish(resizeCanvas);
+  mobile = (typeof window.orientation !== "undefined");
+  gameCanvasObj = $("#GameArea")
+  gameCanvas = gameCanvasObj[0];
+  resizeCanvas();
   loadImages(() =>
     {
+      gridOffset = {x: -gameCentre.x % gridTileSize.w - gridTileSize.w/2,
+                    y: -gameCentre.y % gridTileSize.h - gridTileSize.h/2}
       console.log("init");
-      gameCanvas = $("#GameArea")[0];
-      gameFullSize = {w: gameCanvas.width, h: gameCanvas.height};
-      gameCentre = {x: gameFullSize.w / 2, y: gameFullSize.h / 2};
       car = {
         appearance: createCarAppearance(),
         pos: { x: gameCentre.x, y: gameCentre.y},
@@ -123,8 +167,9 @@ function initialise()
         turn: 0.03,
         xVel: 0,
         yVel: 0,
-        accelerating: true,
-        braking: true,
+        accelerating: false,
+        braking: false,
+        backForce: false,
         speed: 0
       };
       $(window).blur(pauseGame);
@@ -133,7 +178,7 @@ function initialise()
       $("body").keyup(releaseKey);
     	nameKeys();
     	releaseKeys(isKeyPressed);
-    	makeHighRes(gameCanvas);
+    	//makeHighRes(gameCanvas);
       startGame();
     });
 }
@@ -156,6 +201,10 @@ function checkKeys()
 	{
 		car.braking = true;
 	}
+  if (isKeyPressed["SPACE"])
+  {
+    car.backForce = true;
+  }
 }
 
 function getVector(length, angle)
@@ -170,7 +219,7 @@ function withinBounds(value, range)
   return (value >= range.low && value <= range.high);
 }
 
-function moveObject(obj, bounds)
+function moveObject(obj, bindRadius)
 {
 	acc = 0;
 	brake = 0;
@@ -185,6 +234,10 @@ function moveObject(obj, bounds)
 		acc = -0.2;
 		brake = -0.04;
 	}
+  if (obj.backForce == true)
+  {
+    console.log(obj.turn)
+  }
 
 	obj.speed += acc;
 	obj.speed *= (0.98 + brake);
@@ -195,40 +248,38 @@ function moveObject(obj, bounds)
     x: obj.pos.x + velocityVector.x,
     y: obj.pos.y + velocityVector.y
   };
-  if (bounds == undefined)
+
+  if (bindRadius == undefined)
   {
     obj.pos = newPos;
   }
   else
   {
-    distFromCentreSq = Math.pow(newPos.x - 600, 2) + Math.pow(newPos.y - 400, 2);
-    //if (distFromCentreSq > 30000)
-    //{
-      adjFac = Math.pow(40000 / distFromCentreSq, 0.5);
-      adjFac = Math.pow((50000 - distFromCentreSq) / 50000, 0.2);
-      if (distFromCentreSq == 0) adjFac = 1;
+    distFromCentreSq = Math.pow(newPos.x - gameCentre.x, 2) + Math.pow(newPos.y - gameCentre.y, 2);
 
-      //adjFac = 40000 / distFromCentreSq;
-      remainder = {x: newPos.x, y: newPos.y};
-      newPos.x = 600 + (newPos.x - 600) * adjFac;
-      newPos.y = 400 + (newPos.y - 400) * adjFac;
-      remainder.x = remainder.x - newPos.x;
-      remainder.y = remainder.y - newPos.y;
-    //}
+    bindRadiusSq = bindRadius*bindRadius;
+    adjFac = Math.pow((bindRadiusSq - distFromCentreSq) / bindRadiusSq, 0.2);
+    if (distFromCentreSq == 0) adjFac = 1;
+
+    remainder = {x: newPos.x, y: newPos.y};
+    newPos.x = gameCentre.x + (newPos.x - gameCentre.x) * adjFac;
+    newPos.y = gameCentre.y + (newPos.y - gameCentre.y) * adjFac;
+    remainder.x = remainder.x - newPos.x;
+    remainder.y = remainder.y - newPos.y;
     obj.pos = newPos;
-    //if (withinBounds(newPos.x, bounds.x)) obj.pos.x = newPos.x;
-	  //if (withinBounds(newPos.y, bounds.y)) obj.pos.y = newPos.y;
   }
+
   return remainder;
 }
 
 function tick()
 {
 	car.accelerating = false;
+  if (mobile) car.accelerating = true;
 	car.braking = false;
+  car.backForce = false;
 	checkKeys();
-  carBounds = {x: {low: 400, high: 800}, y: {low: 200, high: 600}};
-	rem = moveObject(car, carBounds);
+	rem = moveObject(car, 223);
   gridOffset.x += rem.x;
   gridOffset.y += rem.y;
   gridOffset.x = gridOffset.x % gridTileSize.w;

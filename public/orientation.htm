@@ -1,0 +1,25 @@
+<html>
+  <head>
+    <script>
+      window.addEventListener('deviceorientation', function(e) {
+        orientationText.innerHTML = "[" + Math.round(e.alpha) + "], " +
+                                    "[" + Math.round(e.beta)  + "], " +
+                                    "[" + Math.round(e.gamma) + "]";
+      });
+      /*tick = function()
+      {
+        orientationText = document.getElementById("orientationText");
+        orientationText.innerHTML = window.orientation + " " + Math.random();
+      }
+      window.onload = function()
+      {
+        setInterval(tick, 500);
+      }*/
+    </script>
+  </head>
+  <body>
+    <div id="orientationText">
+
+    </div>
+  </body>
+</html>
