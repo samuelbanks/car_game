@@ -7,10 +7,10 @@ establishConnection = function(mongo)
     if (err) throw err;
     var dbo = db.db("mydb");
     console.log("Connected to database");
-    // dbo.createCollection("messages", function(err, res) {
-    //   if (err) throw err;
-    //   console.log("Created collection")
-    // })
+    dbo.createCollection("messages", function(err, res) {
+      // if (err) throw err;
+      // console.log("Created collection")
+    })
 
     db.close();
   });

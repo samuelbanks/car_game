@@ -3,7 +3,7 @@ var express = require('express');
 var http    = require('http');
 var https   = require('https');
 var path    = require('path');
-var mongo   = require('mongodb');
+ // var mongo   = require('mongodb');
 require('./database');
 
 var privateKey  = fs.readFileSync('certs/privkey.pem',   'utf8');
@@ -52,4 +52,4 @@ makeAbsolute = (relativePath) => {
   return path.join(__dirname, relativePath);
 }
 
-establishConnection(mongo);
+// establishConnection(mongo);
