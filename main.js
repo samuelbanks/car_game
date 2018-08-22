@@ -4,7 +4,7 @@ var http    = require('http');
 var https   = require('https');
 var path    = require('path');
  // var mongo   = require('mongodb');
-require('./database');
+require('./server/multiplayer');
 
 var privateKey  = fs.readFileSync('certs/privkey.pem',   'utf8');
 var certificate = fs.readFileSync('certs/fullchain.pem', 'utf8');
@@ -25,7 +25,7 @@ app.get('/', (req, res) => {
 
 app.get('/favicon.png', (req, res) => {
     res.sendFile(makeAbsolute('images/icon.png'));
-})
+});
 
 app.get('/public/*', (req, res) => {
   absolutePath = makeAbsolute(req.url);
@@ -35,13 +35,19 @@ app.get('/public/*', (req, res) => {
   } else {
     res.sendStatus(404)
   }
-})
+});
 
 app.get(('/message/*'), (req, res) => {
   res.send("message received: " + req.url);
   var message = req.url.substr(req.url.indexOf("/", 1)+1);
   console.log(unescape(message))
-})
+});
+
+app.get('/playerupdate/*', (req, res) => {
+  var message = req.url.substr(req.url.indexOf("/", 1)+1);
+  handleUpdate(message);
+  res.send("thanks");
+});
 
 var httpServer  = http.createServer(httpApp);
 var httpsServer = https.createServer(credentials, app);

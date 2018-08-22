@@ -8,6 +8,9 @@ var gameFullSize;
 var gameCentre;
 var gameCanvas;
 var mobile = false;
+var cars = [];
+var camera = {x: 0, y: 0, zoom: 1};
+var myCarId = 0;
 
 var images = [];   // using optional size for image
 
@@ -78,34 +81,6 @@ startGame = function()
   }
 }
 
-copyObject = function(obj)
-{
-  var newObj = {};
-  for (var elemId in obj)
-  {
-    if (typeof(obj[elemId]) == "object")
-    {
-      newObj[elemId] = copyObject(obj[elemId]);
-    }
-    else
-    {
-      newObj[elemId] = obj[elemId];
-    }
-  }
-  return newObj;
-}
-
-var car;
-// ---
-
-// function $(handle)
-// {
-// 	if (handle.substring(0, 1) == "#")
-// 	{
-// 		return document.getElementById(handle.substring(1));
-// 	}
-// }
-
 function pressKey(e)
 {
 	isKeyPressed[keyNames[e.keyCode]] = true;
@@ -144,13 +119,10 @@ resizeCanvas = function()
   gameCanvas.height = $(window).height() - 20 * 2;
   gameFullSize = {w: gameCanvas.width, h: gameCanvas.height};
   gameCentre = {x: gameFullSize.w / 2, y: gameFullSize.h / 2};
-  gridOffset.x += ((gameCanvas.width - oldWidth) % gridTileSize.w) / 2;
-  gridOffset.y += ((gameCanvas.height - oldHeight) % gridTileSize.h) / 2;
 }
 
 function initialise()
 {
-  onWindowResizeFinish(resizeCanvas);
   mobile = (typeof window.orientation !== "undefined");
   gameCanvasObj = $("#GameArea")
   gameCanvas = gameCanvasObj[0];
@@ -160,8 +132,8 @@ function initialise()
       gridOffset = {x: -gameCentre.x % gridTileSize.w - gridTileSize.w/2,
                     y: -gameCentre.y % gridTileSize.h - gridTileSize.h/2}
       console.log("init");
-      car = {
-        appearance: createCarAppearance(),
+      cars[myCarId] = {
+        appearance: createCarAppearance("#5073ff"),
         pos: { x: gameCentre.x, y: gameCentre.y},
         rotation: 0,
         turn: 0.03,
@@ -172,6 +144,9 @@ function initialise()
         backForce: false,
         speed: 0
       };
+      cars[1] = copyObject(cars[0]);
+      cars[1].x += 200; cars[1].y += 200;
+      cars[1].appearance = createCarAppearance("#56b07c")
       $(window).blur(pauseGame);
       $(document).keydown((e) => {if (e.keyCode != 9) startGame();});
       $("body").keydown(pressKey);
@@ -187,23 +162,23 @@ function checkKeys()
 {
 	if (isKeyPressed["LEFT"])
 	{
-		car.rotation -= car.turn;
+		cars[myCarId].rotation -= cars[myCarId].turn;
 	}
 	if (isKeyPressed["RIGHT"])
 	{
-		car.rotation += car.turn;
+		cars[myCarId].rotation += cars[myCarId].turn;
 	}
 	if (isKeyPressed["UP"])
 	{
-		car.accelerating = true;
+		cars[myCarId].accelerating = true;
 	}
 	if (isKeyPressed["DOWN"])
 	{
-		car.braking = true;
+		cars[myCarId].braking = true;
 	}
   if (isKeyPressed["SPACE"])
   {
-    car.backForce = true;
+    cars[myCarId].backForce = true;
   }
 }
 
@@ -274,19 +249,23 @@ function moveObject(obj, bindRadius)
 
 function tick()
 {
-	car.accelerating = false;
-  if (mobile) car.accelerating = true;
-	car.braking = false;
-  car.backForce = false;
+	cars[myCarId].accelerating = false;
+	cars[myCarId].braking = false;
+  cars[myCarId].backForce = false;
 	checkKeys();
-	rem = moveObject(car, 223);
-  gridOffset.x += rem.x;
-  gridOffset.y += rem.y;
+  var radius = 223;
+	var remainder = moveObject(cars[myCarId], radius);
+  gridOffset.x += remainder.x;
+  gridOffset.y += remainder.y;
   gridOffset.x = gridOffset.x % gridTileSize.w;
   gridOffset.y = gridOffset.y % gridTileSize.h;
+
 	clearCanvas(gameCanvas);
   drawGrid(gameCanvas, gridOffset);
-	drawObject(gameCanvas, car);
+  for(var carId in cars)
+  {
+    drawObject(gameCanvas, cars[carId]);
+  }
 }
 
 function clearCanvas(ctx)
@@ -326,7 +305,8 @@ loadDependencies = function(onComplete)
   dependencies = ["scripts/images",
                   "scripts/mechanics",
                   "scripts/drawing",
-                  "scripts/shapes"];
+                  "scripts/shapes",
+                  "scripts/utils"];
   console.log("Loading scripts...");
   requirejs(dependencies,
     () => {

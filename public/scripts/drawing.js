@@ -16,7 +16,6 @@ function center(coords, centerPoint)
 
 function drawGrid(canvas, offset)
 {
-
 	context = canvas.getContext("2d");
   /*context.beginPath();
   context.lineWidth = 1;

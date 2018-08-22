@@ -1,20 +1,20 @@
-function createCarAppearance()
+function createCarAppearance(colour)
 {
-  randomColour = [Math.round(Math.random()*255),
-                  Math.round(Math.random()*255),
-                  Math.round(Math.random()*255)];
-  randomColour = "rgba(" +
-                  randomColour[0] + "," +
-                  randomColour[1] + "," +
-                  randomColour[2] + ",1)";
-  randomColour = "rgba(0, 0, 255, 1)";
-  console.log(randomColour);
+  // randomColour = [Math.round(Math.random()*255),
+  //                 Math.round(Math.random()*255),
+  //                 Math.round(Math.random()*255)];
+  // randomColour = "rgba(" +
+  //                 randomColour[0] + "," +
+  //                 randomColour[1] + "," +
+  //                 randomColour[2] + ",1)";
+  // randomColour = "rgba(0, 0, 255, 1)";
+  // console.log(randomColour);
 	var elements = [];
 	elements.push({
 		type: "fill",
 		pos: {x: -9, y: -4},
     size: {x: 17, y: 26},
-		color: randomColour, // "#0000ff",
+		color: colour, // "#0000ff",
 		width: 1,
 		alpha: 1
 	});
