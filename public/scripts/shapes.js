@@ -12,8 +12,8 @@ function createCarAppearance(colour)
 	var elements = [];
 	elements.push({
 		type: "fill",
-		pos: {x: -9, y: -4},
-    size: {x: 17, y: 26},
+		pos:  {x:   4, y: - 9},
+    size: {x: -26, y:  17},
 		color: colour, // "#0000ff",
 		width: 1,
 		alpha: 1
@@ -21,11 +21,11 @@ function createCarAppearance(colour)
 	elements.push({
 		type: "path",
 		points: [
-			{ x: -10, y: - 5 },
-			{ x:   9, y: - 5 },
-			{ x:   9, y:  23 },
-			{ x: -10, y:  23 },
-			{ x: -10, y: - 5 }
+			{ x:   5, y: -10 },
+			{ x:   5, y:   9 },
+			{ x: -23, y:   9 },
+			{ x: -23, y: -10 },
+			{ x:   5, y: -10 }
 		],
 		color: "#000",
 		width: 1,
@@ -34,11 +34,11 @@ function createCarAppearance(colour)
 	elements.push({
 		type: "path",
 		points: [
-			{ x: - 9, y: - 4 },
-			{ x:   8, y: - 4 },
-			{ x:   8, y:  22 },
-			{ x: - 9, y:  22 },
-			{ x: - 9, y: - 4 }
+			{ x:   4, y: -9 },
+			{ x:   4, y:  8 },
+			{ x: -22, y:  8 },
+			{ x: -22, y: -9 },
+			{ x:   4, y: -9 }
 		],
 		color: "#fff",
 		width: 1,
@@ -47,11 +47,11 @@ function createCarAppearance(colour)
 	elements.push({
 		type: "path",
 		points: [
-			{ x: -11, y: - 3 },
-			{ x: -11, y:   4 },
-			{ x: -12, y:   4 },
-			{ x: -12, y: - 3 },
-			{ x: -11, y: - 3 },
+			{ x:  3, y: -11 },
+			{ x: -4, y: -11 },
+			{ x: -4, y: -12 },
+			{ x:  3, y: -12 },
+			{ x:  3, y: -11 },
 		],
 		color: "#000",
 		width: 1,
@@ -60,11 +60,11 @@ function createCarAppearance(colour)
 	elements.push({
 		type: "path",
 		points: [
-			{ x:  10, y: - 3 },
-			{ x:  10, y:   4 },
-			{ x:  11, y:   4 },
-			{ x:  11, y: - 3 },
-			{ x:  10, y: - 3 }
+			{ x:  3, y: 10 },
+			{ x: -4, y: 10 },
+			{ x: -4, y: 11 },
+			{ x:  3, y: 11 },
+			{ x:  3, y: 10 }
 		],
 		color: "#000",
 		width: 1,

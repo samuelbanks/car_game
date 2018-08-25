@@ -9,8 +9,21 @@ var gameCentre;
 var gameCanvas;
 var mobile = false;
 var cars = [];
-var camera = {x: 0, y: 0, zoom: 1};
-var myCarId = 0;
+var camera = {x: 0, y: 0, width: 1, height: 1, zoom: 1, rotation: 0};
+var playerId = 0;
+var socket;
+var numPlayers = 0;
+var firstTick;
+var fps = 60;
+var currentScreen = "";
+
+var constants = {forwardAcc: 0.3*60/fps,
+                 brakingDec: 0.2*60/fps,
+                 decelFactor: Math.pow(0.98,60/fps),
+                 brakingDecelFactor: Math.pow(0.94,60/fps),
+                 maxSpeedResistance: Math.pow(0.99,60/fps),
+                 turn: 0.03*60/fps,
+                 speedLimit: 4*60/fps};
 
 var images = [];   // using optional size for image
 
@@ -76,7 +89,6 @@ startGame = function()
 {
   if (tickerHandle == 0)
   {
-    var fps = 60;
     tickerHandle = setInterval(tick, 1000/fps);
   }
 }
@@ -121,71 +133,109 @@ resizeCanvas = function()
   gameCentre = {x: gameFullSize.w / 2, y: gameFullSize.h / 2};
 }
 
-function initialise()
+createServerConnection = function(method)
 {
+  socket = io.connect();
+  /*if (method == "new") {
+    socket.on("game_request", {method: "new"});
+  } else if (method == "join") {
+    socket.emit("game_request", {method: "join", room: })
+  }*/
+  socket.on('playerId', function(message) {
+    playerId = message;
+    console.log("You are player", playerId);
+  });
+  socket.on('game_status', function(message) {
+    console.log("game_status");
+    console.log(message)
+    if (message.ready == true) {
+      initialise(message.numPlayers);
+    }
+  })
+  socket.on('car_position_update', function(message)
+  {
+    for (var i=0; i<numPlayers; i++)
+    {
+      if (i != playerId)
+      {
+        cars[i].pos = {x: message[i].pos.x, y: message[i].pos.y};
+        cars[i].rotation = message[i].rotation;
+      }
+    }
+  })
+  return socket;
+}
+
+function initialise(pNumPlayers)
+{
+  firstTick = true;
+  numPlayers = pNumPlayers;
   mobile = (typeof window.orientation !== "undefined");
   gameCanvasObj = $("#GameArea")
   gameCanvas = gameCanvasObj[0];
   resizeCanvas();
-  loadImages(() =>
+  camera.width = gameCanvas.width;
+  camera.height = gameCanvas.height;
+  loadImages(() => {
+    gridOffset = {x: -gameCentre.x % gridTileSize.w - gridTileSize.w/2,
+                  y: -gameCentre.y % gridTileSize.h - gridTileSize.h/2}
+    console.log("init");
+    cars[0] = {
+      appearance: createCarAppearance("#5073ff"),
+      pos: { x: 0, y: 0 },
+      rotation: Math.PI/2,
+      turn: constants.turn,
+      xVel: 0,
+      yVel: 0,
+      accelerating: false,
+      braking: false,
+      backForce: false,
+      speed: 0
+    };
+    for (var i=1;i<numPlayers;i++)
     {
-      gridOffset = {x: -gameCentre.x % gridTileSize.w - gridTileSize.w/2,
-                    y: -gameCentre.y % gridTileSize.h - gridTileSize.h/2}
-      console.log("init");
-      cars[myCarId] = {
-        appearance: createCarAppearance("#5073ff"),
-        pos: { x: gameCentre.x, y: gameCentre.y},
-        rotation: 0,
-        turn: 0.03,
-        xVel: 0,
-        yVel: 0,
-        accelerating: false,
-        braking: false,
-        backForce: false,
-        speed: 0
-      };
-      cars[1] = copyObject(cars[0]);
-      cars[1].x += 200; cars[1].y += 200;
-      cars[1].appearance = createCarAppearance("#56b07c")
-      $(window).blur(pauseGame);
-      $(document).keydown((e) => {if (e.keyCode != 9) startGame();});
-      $("body").keydown(pressKey);
-      $("body").keyup(releaseKey);
-    	nameKeys();
-    	releaseKeys(isKeyPressed);
-    	//makeHighRes(gameCanvas);
-      startGame();
-    });
+      cars[i] = copyObject(cars[0]);
+      cars[i].appearance = createCarAppearance("#56b07c");
+    }
+    //$(window).blur(pauseGame);
+    $(document).keydown((e) => {if (e.keyCode != 9) startGame();});
+    $("body").keydown(pressKey);
+    $("body").keyup(releaseKey);
+  	nameKeys();
+  	releaseKeys(isKeyPressed);
+  	//makeHighRes(gameCanvas);
+    startGame();
+  });
 }
 
 function checkKeys()
 {
 	if (isKeyPressed["LEFT"])
 	{
-		cars[myCarId].rotation -= cars[myCarId].turn;
+		cars[playerId].rotation += cars[playerId].turn;
 	}
 	if (isKeyPressed["RIGHT"])
 	{
-		cars[myCarId].rotation += cars[myCarId].turn;
+		cars[playerId].rotation -= cars[playerId].turn;
 	}
 	if (isKeyPressed["UP"])
 	{
-		cars[myCarId].accelerating = true;
+		cars[playerId].accelerating = true;
 	}
 	if (isKeyPressed["DOWN"])
 	{
-		cars[myCarId].braking = true;
+		cars[playerId].braking = true;
 	}
   if (isKeyPressed["SPACE"])
   {
-    cars[myCarId].backForce = true;
+    cars[playerId].backForce = true;
   }
 }
 
 function getVector(length, angle)
 {
-	vec = {x: length * Math.cos(angle),
-         y: length * Math.sin(angle)} ;
+	vec = {x:  length * Math.cos(angle),
+         y: -length * Math.sin(angle)} ;
 	return vec;
 }
 
@@ -196,34 +246,37 @@ function withinBounds(value, range)
 
 function moveObject(obj, bindRadius)
 {
-	acc = 0;
-	brake = 0;
-  remainder = {x: 0, y: 0}
+	var acc = 0;
+	var brake = 0;
+  var remainder = {x: 0, y: 0}
 	if (obj.accelerating == true)
 	{
 		//obj.speed = obj.speed + 1/(obj.speed+1)-0.1
-		acc = 0.3;
+		acc = constants.forwardAcc;
 	}
 	if (obj.braking == true)
 	{
-		acc = -0.2;
-		brake = -0.04;
-	}
+		acc = -constants.brakingDec;
+		decelFactor = constants.brakingDecelFactor;
+	} else {
+    decelFactor = constants.decelFactor;
+  }
   if (obj.backForce == true)
   {
     console.log(obj.turn)
   }
 
 	obj.speed += acc;
-	obj.speed *= (0.98 + brake);
+	obj.speed *= decelFactor;
 	if (Math.abs(obj.speed) < 0.01) { obj.speed = 0; }
-	if (obj.speed > 4) { obj.speed *= 0.99; }
-	velocityVector = getVector(obj.speed, obj.rotation - Math.PI/2);
+	if (obj.speed > constants.speedLimit) { obj.speed *= constants.maxSpeedResistance; }
+	velocityVector = getVector(obj.speed, obj.rotation); // - Math.PI/2);
   newPos = {
     x: obj.pos.x + velocityVector.x,
     y: obj.pos.y + velocityVector.y
   };
 
+  bindRadius = undefined;
   if (bindRadius == undefined)
   {
     obj.pos = newPos;
@@ -247,25 +300,70 @@ function moveObject(obj, bindRadius)
   return remainder;
 }
 
+dist = function(c1, c2)
+{
+  dx = c2.x-c1.x;
+  dy = c2.y-c1.y;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+// follow = function()
+// {
+//   dx = cars[0].pos.x - cars[1].pos.x;
+//   dy = cars[0].pos.y - cars[1].pos.y;
+//   if (dx == 0) {
+//     angle=-Math.PI/2
+//     if (dy>0) angle*=-1;
+//   } else {
+//     angle = Math.atan(dy/dx);
+//   }
+//   if (dx > 0 && dy > 0) angle *= -1
+//   if (dx > 0 && dy < 0) angle *= -1
+//   if (dx < 0 && dy > 0) angle = -Math.PI-angle;
+//   if (dx < 0 && dy < 0) angle = Math.PI-angle;
+//   rotTurn = (angle - cars[1].rotation);
+//   if (rotTurn < -Math.PI) rotTurn += 2*Math.PI;
+//   if (rotTurn >  Math.PI) rotTurn -= 2*Math.PI;
+//   limitedTurn = Math.min(cars[1].turn, Math.max(-cars[1].turn, rotTurn))
+//   if (Math.abs(rotTurn) < Math.PI/8) cars[1].accelerating = true;
+//   if (dist(cars[0].pos, cars[1].pos) < 100 && cars[0].accelerating == false) cars[1].accelerating = false;
+//   moveObject(cars[1]);
+//   cars[1].rotation += limitedTurn;
+//   desiredRot = dx
+// }
+
 function tick()
 {
-	cars[myCarId].accelerating = false;
-	cars[myCarId].braking = false;
-  cars[myCarId].backForce = false;
+	cars[playerId].accelerating = false;
+	cars[playerId].braking = false;
+  cars[playerId].backForce = false;
+  //if (mobile) cars[playerId].accelerating = true;
 	checkKeys();
+  //follow();
   var radius = 223;
-	var remainder = moveObject(cars[myCarId], radius);
+  var lastCarPos = {x: cars[playerId].pos.x, y: cars[playerId].pos.y};
+	var remainder = moveObject(cars[playerId], radius);
+  var carHasMoved = cars[playerId].pos.x != lastCarPos.x |
+                    cars[playerId].pos.y != lastCarPos.y;
+  if (firstTick | carHasMoved)
+  {
+    socket.emit('car_position_update', {pos: cars[playerId].pos,
+                                        rotation: cars[playerId].rotation});
+  }
+
+  adjustCamera(camera, cars);
   gridOffset.x += remainder.x;
   gridOffset.y += remainder.y;
   gridOffset.x = gridOffset.x % gridTileSize.w;
   gridOffset.y = gridOffset.y % gridTileSize.h;
 
 	clearCanvas(gameCanvas);
-  drawGrid(gameCanvas, gridOffset);
+  drawGrid(gameCanvas, gridOffset, camera);
   for(var carId in cars)
   {
-    drawObject(gameCanvas, cars[carId]);
+    drawObject(gameCanvas, cars[carId], camera);
   }
+  firstTick = false;
 }
 
 function clearCanvas(ctx)
@@ -300,6 +398,36 @@ function makeHighRes(c)
 	}
 }
 
+showSplash = function() {
+  currentScreen = "splash";
+  gameCanvas = $("#GameArea")[0];
+  gameCanvas.addEventListener("mousedown", function(e) {
+    var x = e.offsetX, y = e.offsetY;
+    if (x > 20 && x < 260 && y > 20 && y < 80)
+    {
+      socket = createServerConnection("new");
+    }
+    if (x > 20 && x < 260 && y > 100 && y < 160)
+    {
+      socket = createServerConnection("join");
+    }
+  })
+  resizeCanvas();
+  var ctx = gameCanvas.getContext("2d");
+	ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 1;
+  ctx.fillRect(20.5, 20.5, 240, 60);
+  ctx.fillRect(20.5, 100.5, 240, 60);
+  ctx.strokeRect(20.5, 20.5, 240, 60);
+  ctx.strokeRect(20.5, 100.5, 240, 60);
+  ctx.font = "40px Ubuntu"
+  ctx.fillStyle="#000"
+  ctx.fillText("New Game", 40, 65)
+  ctx.fillText("Join Game", 43, 145)
+}
+
 loadDependencies = function(onComplete)
 {
   dependencies = ["scripts/images",
@@ -315,4 +443,8 @@ loadDependencies = function(onComplete)
     });
 }
 
-$(document).ready(() => {loadDependencies(initialise)});
+$(document).ready(() => {
+  loadDependencies(() => {
+    showSplash();
+  });
+});

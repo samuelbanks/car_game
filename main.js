@@ -3,6 +3,8 @@ var express = require('express');
 var http    = require('http');
 var https   = require('https');
 var path    = require('path');
+var socket  = require('socket.io')
+var XHash   = require('xxhash');
  // var mongo   = require('mongodb');
 require('./server/multiplayer');
 
@@ -37,22 +39,65 @@ app.get('/public/*', (req, res) => {
   }
 });
 
-app.get(('/message/*'), (req, res) => {
-  res.send("message received: " + req.url);
-  var message = req.url.substr(req.url.indexOf("/", 1)+1);
-  console.log(unescape(message))
+app.get('/info/*', (req, res) =>
+{
+  var detail = req.url.substring(req.url.indexOf("/", 1)+1);
+  if (detail == "rooms") {
+    res.status(200).send(rooms);
+  }
+})
+
+app.get('/newRoom/', (req, res) =>
+{
+  let r = newRoom();
+  res.send({room: r});
 });
 
-app.get('/playerupdate/*', (req, res) => {
-  var message = req.url.substr(req.url.indexOf("/", 1)+1);
-  handleUpdate(message);
-  res.send("thanks");
-});
-
+var rooms = [];
 var httpServer  = http.createServer(httpApp);
 var httpsServer = https.createServer(credentials, app);
+var io = socket.listen(httpsServer);
+
+rooms = [];
+
 httpServer.listen(8080);
 httpsServer.listen(8443);
+
+var numPlayers = 0;
+var maxPlayers = 2;
+var playerSocket = [];
+var carPosition = [];
+var acceptingPlayers = true;
+
+newRoom = function() {
+  var index = rooms.length;
+  var roomId = XHash.hash64(new Buffer("rm_"+index.toString()),
+                            0x008cc8,
+                            'hex');
+  rooms[index] = {index: index, players: 0, id: roomId};
+  return rooms[index];
+}
+
+io.sockets.on('connection', function(socket) {
+  if (numPlayers >= maxPlayers) return;
+  var playerId = numPlayers++;
+  playerSocket[playerId] = socket;
+
+  console.log("Player number", numPlayers, "has joined!");
+  socket.emit('playerId', playerId);
+
+  socket.on('car_position_update', function(message) {
+    carPosition[playerId] = message;
+    //console.log(message);
+    socket.broadcast.volatile.emit('car_position_update', carPosition);
+  })
+
+  if (numPlayers == maxPlayers)
+  {
+    acceptingPlayers = false;
+    io.emit('game_status', {'ready': true, 'numPlayers': numPlayers});
+  };
+})
 
 makeAbsolute = (relativePath) => {
   return path.join(__dirname, relativePath);
