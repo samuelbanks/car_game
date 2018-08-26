@@ -27,6 +27,15 @@ var constants = {forwardAcc: 0.3*60/fps,
 
 var images = [];   // using optional size for image
 
+const copyToClipboard = str => {
+  const el = document.createElement('textarea');
+  el.value = str;
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand('copy');
+  document.body.removeChild(el);
+};
+
 onWindowResizeFinish = function(callback)
 {
   var rtime;
@@ -133,41 +142,66 @@ resizeCanvas = function()
   gameCentre = {x: gameFullSize.w / 2, y: gameFullSize.h / 2};
 }
 
-createServerConnection = function(method)
+createServerConnection = function(pRoomId)
 {
-  socket = io.connect();
-  /*if (method == "new") {
-    socket.on("game_request", {method: "new"});
-  } else if (method == "join") {
-    socket.emit("game_request", {method: "join", room: })
-  }*/
+  var socket = io.connect();
+  console.log(pRoomId);
+  socket.emit('join_room', {roomId: pRoomId});
+  socket.on('join_room', function(message) {
+    if (message.success == true)
+    {
+      roomId = pRoomId;
+      toggleMenu(false);
+      toggleGame(true);
+      initialiseGame(4);
+    }
+  });
   socket.on('playerId', function(message) {
     playerId = message;
     console.log("You are player", playerId);
   });
-  socket.on('game_status', function(message) {
+  /*socket.on('game_status', function(message) {
     console.log("game_status");
     console.log(message)
     if (message.ready == true) {
-      initialise(message.numPlayers);
+      initialiseGame(message.numPlayers);
     }
-  })
+  })*/
   socket.on('car_position_update', function(message)
   {
     for (var i=0; i<numPlayers; i++)
     {
       if (i != playerId)
       {
-        cars[i].pos = {x: message[i].pos.x, y: message[i].pos.y};
-        cars[i].rotation = message[i].rotation;
+        if (typeof(message[i]) != "undefined") {
+          cars[i].pos = {x: message[i].pos.x, y: message[i].pos.y};
+          cars[i].rotation = message[i].rotation;
+        }
       }
     }
   })
   return socket;
 }
 
-function initialise(pNumPlayers)
+newCar = function(colour)
 {
+  return {
+    appearance: createCarAppearance(colour),
+    pos: { x: 0, y: 0 },
+    rotation: Math.PI/2,
+    turn: constants.turn,
+    xVel: 0,
+    yVel: 0,
+    accelerating: false,
+    braking: false,
+    backForce: false,
+    speed: 0
+  };
+}
+
+function initialiseGame(pNumPlayers)
+{
+  palette = ["#6D8AFF", "#56b07c", "#fe5f55", "#edc110"]
   firstTick = true;
   numPlayers = pNumPlayers;
   mobile = (typeof window.orientation !== "undefined");
@@ -180,22 +214,13 @@ function initialise(pNumPlayers)
     gridOffset = {x: -gameCentre.x % gridTileSize.w - gridTileSize.w/2,
                   y: -gameCentre.y % gridTileSize.h - gridTileSize.h/2}
     console.log("init");
-    cars[0] = {
-      appearance: createCarAppearance("#5073ff"),
-      pos: { x: 0, y: 0 },
-      rotation: Math.PI/2,
-      turn: constants.turn,
-      xVel: 0,
-      yVel: 0,
-      accelerating: false,
-      braking: false,
-      backForce: false,
-      speed: 0
-    };
+    cars[0] = newCar(palette[0]);
+    cars[0].pos.x = -150;
     for (var i=1;i<numPlayers;i++)
     {
-      cars[i] = copyObject(cars[0]);
-      cars[i].appearance = createCarAppearance("#56b07c");
+      cars[i] = newCar();
+      cars[i].appearance = createCarAppearance(palette[i]);
+      cars[i].pos.x = -150 + i * 100;
     }
     //$(window).blur(pauseGame);
     $(document).keydown((e) => {if (e.keyCode != 9) startGame();});
@@ -347,7 +372,8 @@ function tick()
                     cars[playerId].pos.y != lastCarPos.y;
   if (firstTick | carHasMoved)
   {
-    socket.emit('car_position_update', {pos: cars[playerId].pos,
+    socket.emit('car_position_update', {roomId: roomId,
+                                        pos: cars[playerId].pos,
                                         rotation: cars[playerId].rotation});
   }
 
@@ -398,36 +424,6 @@ function makeHighRes(c)
 	}
 }
 
-showSplash = function() {
-  currentScreen = "splash";
-  gameCanvas = $("#GameArea")[0];
-  gameCanvas.addEventListener("mousedown", function(e) {
-    var x = e.offsetX, y = e.offsetY;
-    if (x > 20 && x < 260 && y > 20 && y < 80)
-    {
-      socket = createServerConnection("new");
-    }
-    if (x > 20 && x < 260 && y > 100 && y < 160)
-    {
-      socket = createServerConnection("join");
-    }
-  })
-  resizeCanvas();
-  var ctx = gameCanvas.getContext("2d");
-	ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
-  ctx.fillStyle = "#fff";
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = 1;
-  ctx.fillRect(20.5, 20.5, 240, 60);
-  ctx.fillRect(20.5, 100.5, 240, 60);
-  ctx.strokeRect(20.5, 20.5, 240, 60);
-  ctx.strokeRect(20.5, 100.5, 240, 60);
-  ctx.font = "40px Ubuntu"
-  ctx.fillStyle="#000"
-  ctx.fillText("New Game", 40, 65)
-  ctx.fillText("Join Game", 43, 145)
-}
-
 loadDependencies = function(onComplete)
 {
   dependencies = ["scripts/images",
@@ -443,8 +439,68 @@ loadDependencies = function(onComplete)
     });
 }
 
+requestNewRoom = function() {
+  $.ajax({
+    method: "GET",
+    url: "/newroom"
+  }).done(function(roomInfo) {
+    //createRoomButtons(roomInfo);
+    socket = createServerConnection(roomInfo.room.id);
+  });
+};
+
+joinRoom = function(roomId) {
+  $.ajax({
+    method: "GET",
+    url: "/joinroom/" + roomId
+  }).done(function(roomInfo) {
+    console.log(roomInfo);
+    if (roomInfo.auth == true)
+    {
+      socket = createServerConnection(roomId);
+    }
+  });
+}
+
+queryRoomId = function() {
+  $("#backdrop").show();
+}
+
+initialiseLobby = function() {
+  /*$.ajax({
+    method: "GET",
+    url: "/info/rooms"
+  }).done(function(roomInfo) {
+    //createRoomButtons(roomInfo.rooms);*/
+    $("#newroom").click(requestNewRoom);
+    $("#joinroom").click(queryRoomId);
+    $("#roomQueryOk").click(() => {
+      var roomId = $("#roomQueryInput").val();
+      joinRoom(roomId);
+    });
+    $("#roomQueryCancel").click(() => {$("#backdrop").hide()})
+    $("#GameArea").mousedown(() => {copyToClipboard(roomId)});
+  //});
+};
+
+toggleMenu = function(show) {
+  if (show) {
+    $("#centre").show();
+  } else {
+    $("#centre").hide();
+    $("#backdrop").hide();
+  }
+}
+toggleGame = function(show) {
+  if (show) {
+    $("#GameArea").show();
+  } else {
+    $("#GameArea").hide();
+  }
+}
+
 $(document).ready(() => {
   loadDependencies(() => {
-    showSplash();
+    initialiseLobby();
   });
 });

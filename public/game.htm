@@ -18,15 +18,35 @@
         border: 0.5px solid black;
       }
     </style>
-    <link rel="shortcut icon" type="image/png" href="/favicon.png"/>
+    <link rel="stylesheet" href="../public/styles/ui.css" />
+    <link rel="shortcut icon" type="image/png" href="/favicon.png" />
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="../public/scripts/require.js"></script>
     <script src="../public/scripts/code.js"></script>
   </head>
   <body>
-    <canvas id="GameArea">
+    <canvas id="GameArea" style="display: none;">
       Your browser does not support the HTML5 canvas tag.
     </canvas>
+
+    <div id="centre">
+      <div id="footer">
+        <div id="newroom" class="button">
+          <p>New Room</p>
+        </div>
+          <div id="joinroom" class="button">
+            <p>Join Room</p>
+          </div>
+      </div>
+    </div>
+
+    <div id="backdrop" style="display: none;">
+      <div id="roomQuery">
+        <input id="roomQueryInput" placeholder="Enter Room ID" value="0817c58788c6cb1f"/>
+        <div id="roomQueryOk" class="button"><p>OK</p></div>
+        <div id="roomQueryCancel" class="button"><p>Cancel</p></div>
+      </div>
+    </div>
   </body>
 </html>

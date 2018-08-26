@@ -39,18 +39,34 @@ app.get('/public/*', (req, res) => {
   }
 });
 
-app.get('/info/*', (req, res) =>
+/*app.get('/info/*', (req, res) =>
 {
   var detail = req.url.substring(req.url.indexOf("/", 1)+1);
   if (detail == "rooms") {
     res.status(200).send(rooms);
   }
-})
+})*/
 
-app.get('/newRoom/', (req, res) =>
+app.get('/newroom/', (req, res) =>
 {
   let r = newRoom();
   res.send({room: r});
+});
+
+app.get('/joinroom/*', (req, res) =>
+{
+  var roomIndex = req.url.substring(req.url.indexOf("/", 1)+1);
+  if (typeof(rooms[roomIndex]) != "undefined")
+  {
+    if (rooms[roomIndex].players < maxPlayers)
+    {
+      res.send({auth: true});
+    } else {
+      res.send({auth: false, reason: "Too many players in room"})
+    }
+  } else {
+    res.send({auth: false, reason: "Room doesn't exist"})
+  }
 });
 
 var rooms = [];
@@ -64,39 +80,46 @@ httpServer.listen(8080);
 httpsServer.listen(8443);
 
 var numPlayers = 0;
-var maxPlayers = 2;
-var playerSocket = [];
+var maxPlayers = 4;
 var carPosition = [];
 var acceptingPlayers = true;
 
 newRoom = function() {
-  var index = rooms.length;
-  var roomId = XHash.hash64(new Buffer("rm_"+index.toString()),
+  // var roomId = XHash.hash64(new Buffer("rm_"+index.toString()),
+  //                           0x008cc8,
+  //                           'hex');
+  var roomId = XHash.hash64(new Buffer(Math.random().toString()),
                             0x008cc8,
                             'hex');
-  rooms[index] = {index: index, players: 0, id: roomId};
-  return rooms[index];
+  rooms[roomId] = {players: 0, id: roomId};
+  return rooms[roomId];
 }
 
 io.sockets.on('connection', function(socket) {
-  if (numPlayers >= maxPlayers) return;
-  var playerId = numPlayers++;
-  playerSocket[playerId] = socket;
+  //if (numPlayers >= maxPlayers) return;
 
-  console.log("Player number", numPlayers, "has joined!");
-  socket.emit('playerId', playerId);
+  console.log(" * New connection made");
 
-  socket.on('car_position_update', function(message) {
-    carPosition[playerId] = message;
-    //console.log(message);
-    socket.broadcast.volatile.emit('car_position_update', carPosition);
-  })
+  socket.on('join_room', function(message) {
+    var roomId = message.roomId;
+    if (typeof(rooms[roomId]) != "undefined")
+    {
+      var playerId = rooms[roomId].players++;
+      console.log(" * Player " + playerId + " has joined room " + roomId);
+      carPosition[roomId] = [];
+      socket.join(roomId);
+      socket.emit('join_room', {success: true});
+      socket.emit('playerId', playerId);
 
-  if (numPlayers == maxPlayers)
-  {
-    acceptingPlayers = false;
-    io.emit('game_status', {'ready': true, 'numPlayers': numPlayers});
-  };
+      socket.on('car_position_update', function(message) {
+        // var roomIdList = Object.keys(socket.rooms);
+        var roomId = message.roomId;
+        carPosition[roomId][playerId] = message;
+        io.in(roomId).volatile.emit('car_position_update', carPosition[roomId]);
+      })
+
+    }
+  });
 })
 
 makeAbsolute = (relativePath) => {
